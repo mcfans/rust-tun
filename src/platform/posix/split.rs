@@ -21,9 +21,11 @@ use crate::platform::posix::Fd;
 use libc;
 
 /// Read-only end for a file descriptor.
+#[derive(Clone)]
 pub struct Reader(pub(crate) Arc<Fd>);
 
 /// Write-only end for a file descriptor.
+#[derive(Clone)]
 pub struct Writer(pub(crate) Arc<Fd>);
 
 impl Read for Reader {

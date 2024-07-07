@@ -13,12 +13,10 @@
 //  0. You just DO WHAT THE FUCK YOU WANT TO.
 
 use std::io::{self, Read, Write};
-use std::mem;
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::sync::Arc;
 
 use crate::platform::posix::Fd;
-use libc;
 
 /// Read-only end for a file descriptor.
 #[derive(Clone)]
@@ -30,46 +28,20 @@ pub struct Writer(pub(crate) Arc<Fd>);
 
 impl Read for Reader {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        unsafe {
-            let amount = libc::read(self.0.as_raw_fd(), buf.as_mut_ptr() as *mut _, buf.len());
-
-            if amount < 0 {
-                return Err(io::Error::last_os_error());
-            }
-
-            Ok(amount as usize)
-        }
+        let ptr = Arc::as_ptr(&self.0).cast_mut();
+        unsafe { Fd::read(ptr.as_mut().unwrap(), buf) }
     }
 
     fn read_vectored(&mut self, bufs: &mut [io::IoSliceMut<'_>]) -> io::Result<usize> {
-        unsafe {
-            let mut msg: libc::msghdr = mem::zeroed();
-            // msg.msg_name: NULL
-            // msg.msg_namelen: 0
-            msg.msg_iov = bufs.as_mut_ptr().cast();
-            msg.msg_iovlen = bufs.len().min(libc::c_int::MAX as usize) as _;
-
-            let n = libc::recvmsg(self.0.as_raw_fd(), &mut msg, 0);
-            if n < 0 {
-                return Err(io::Error::last_os_error());
-            }
-
-            Ok(n as usize)
-        }
+        let ptr = Arc::as_ptr(&self.0).cast_mut();
+        unsafe { Fd::read_vectored(ptr.as_mut().unwrap(), bufs) }
     }
 }
 
 impl Write for Writer {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        unsafe {
-            let amount = libc::write(self.0.as_raw_fd(), buf.as_ptr() as *const _, buf.len());
-
-            if amount < 0 {
-                return Err(io::Error::last_os_error());
-            }
-
-            Ok(amount as usize)
-        }
+        let ptr = Arc::as_ptr(&self.0).cast_mut();
+        unsafe { Fd::write(ptr.as_mut().unwrap(), buf) }
     }
 
     fn flush(&mut self) -> io::Result<()> {
@@ -77,20 +49,8 @@ impl Write for Writer {
     }
 
     fn write_vectored(&mut self, bufs: &[io::IoSlice<'_>]) -> io::Result<usize> {
-        unsafe {
-            let mut msg: libc::msghdr = mem::zeroed();
-            // msg.msg_name = NULL
-            // msg.msg_namelen = 0
-            msg.msg_iov = bufs.as_ptr() as *mut _;
-            msg.msg_iovlen = bufs.len().min(libc::c_int::MAX as usize) as _;
-
-            let n = libc::sendmsg(self.0.as_raw_fd(), &msg, 0);
-            if n < 0 {
-                return Err(io::Error::last_os_error());
-            }
-
-            Ok(n as usize)
-        }
+        let ptr = Arc::as_ptr(&self.0).cast_mut();
+        unsafe { Fd::write_vectored(ptr.as_mut().unwrap(), bufs) }
     }
 }
 
